@@ -41,12 +41,12 @@ def clean_for_lstm(text):
         return padded_phrases
 
 
-model = tf.keras.models.load_model("models/lstm.keras")
+model = tf.keras.models.load_model("models/model_half_clean.keras")
 
 st.title("Well Be AI")
 
 if prompt := st.chat_input("Tell me something..."):
-    phrases = clean_for_lstm(prompt)
+    phrases = clean_for_bert(prompt)
 
     probabilities = model.predict(phrases)
 

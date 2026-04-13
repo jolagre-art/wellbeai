@@ -1,14 +1,14 @@
 import streamlit as st
+from PIL import Image
 import tensorflow as tf
 from keras_hub.src.models.bert.bert_backbone import BertBackbone
-from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import keras_nlp
 import re
 import pickle
+import numpy as np
 
 CLASSES = ["anxiety", "bipolar", "depression", "normal", "personality disorder", "stress", "suicidal"]
-
 
 def clean_text(text: str):
     text = text.replace("\n", " ").replace("\"", " ").lower()
@@ -39,22 +39,87 @@ def clean_for_lstm(text):
         tokenized_phrases = tokenizer.texts_to_sequences([clean_phrase])
         padded_phrases = pad_sequences(tokenized_phrases, maxlen=max_len, padding='post')
         return padded_phrases
-
-
+    
 model = tf.keras.models.load_model("models/model_half_clean.keras")
 
-st.title("Well Be AI")
 
-if prompt := st.chat_input("Tell me something..."):
-    phrases = clean_for_bert(prompt)
+def predict(text):
+    phrases = clean_for_bert(text)
 
     probabilities = model.predict(phrases)
 
-    probas = dict()
-    for idx in range(0, len(CLASSES)):
-        proba = int(probabilities[0][idx] * 10000) / 100.0
-        probas[CLASSES[idx]] = proba
+    return CLASSES[np.argmax(probabilities, axis=1)[0]]
 
-    probas = {k: v for k, v in sorted(probas.items(), key=lambda x: x[1], reverse=True) if v > 0}
-    for k, v in probas.items():
-        st.write(f"{k} {v}")
+
+st.set_page_config(
+    page_title="Well bAI",
+    page_icon="🫂",
+    layout="centered"
+)
+
+st.markdown("""
+    <style>
+        .main {
+            background-color: #f5f7fa;
+        }
+        .title {
+            text-align: center;
+            font-size: 40px;
+            font-weight: bold;
+            color: #4A90E2;
+        }
+        .subtitle {
+            text-align: center;
+            color: gray;
+            margin-bottom: 30px;
+        }
+        .result {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="title">Well bAI</div>', unsafe_allow_html=True)
+#st.markdown('<div class="subtitle">Tell me how you feel</div>', unsafe_allow_html=True)
+
+user_input = st.text_area("Tell me how you feel", height=150)
+
+images = {
+    "anxiety": "images/anxiety.png",
+    "bipolar": "images/bipolar.png",
+    "depression": "images/depression.png",
+    "normal": "images/normal.png",
+    "personality disorder": "images/personality.png",
+    "stress": "images/stress.png",
+    "suicidal": "images/suicidal.png",
+}
+
+messages = {
+    "anxiety": "It seems that you feel anxious 😟",
+    "bipolar": "It seems that you may experience mood swings 🎭",
+    "depression": "It seems that you feel depressed 💙",
+    "normal": "It seems that you feel okay 😊",
+    "personality disorder": "It seems there may be personality-related distress 🧩",
+    "stress": "It seems that you are stressed 😣",
+    "suicidal": "It seems that you may have distressing thoughts 💔",
+}
+
+if st.button("Analyze..."):
+    if user_input.strip() == "":
+        st.warning("Please enter some text.")
+    else:
+        prediction = predict(user_input)
+
+        st.markdown(
+            f'<div class="result">{messages[prediction]}</div>',
+            unsafe_allow_html=True
+        )
+
+        try:
+            img = Image.open(images[prediction])
+            st.image(img, width=250)
+        except:
+            pass

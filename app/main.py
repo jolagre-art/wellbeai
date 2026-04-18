@@ -7,6 +7,7 @@ import keras_nlp
 import re
 import pickle
 import numpy as np
+import pandas as pd
 
 CLASSES = ["anxiety", "bipolar", "depression", "normal", "personality disorder", "stress", "suicidal"]
 
@@ -40,7 +41,7 @@ def clean_for_lstm(text):
         padded_phrases = pad_sequences(tokenized_phrases, maxlen=max_len, padding='post')
         return padded_phrases
     
-model = tf.keras.models.load_model("models/model_half_clean.keras")
+model = None
 
 
 def predict(text):
@@ -52,7 +53,7 @@ def predict(text):
 
 
 st.set_page_config(
-    page_title="Well bAI",
+    page_title="Well beAI",
     page_icon="🫂",
     layout="centered"
 )
@@ -68,11 +69,6 @@ st.markdown("""
             font-weight: bold;
             color: #4A90E2;
         }
-        .subtitle {
-            text-align: center;
-            color: gray;
-            margin-bottom: 30px;
-        }
         .result {
             font-size: 24px;
             font-weight: bold;
@@ -82,44 +78,83 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="title">Well bAI</div>', unsafe_allow_html=True)
-#st.markdown('<div class="subtitle">Tell me how you feel</div>', unsafe_allow_html=True)
+tab1, tab2 = st.tabs(["Deep Learning", "Machine Learning"])
 
-user_input = st.text_area("Tell me how you feel", height=150)
+with tab1:
+    st.markdown('<div class="title">Well beAI</div>', unsafe_allow_html=True)
 
-images = {
-    "anxiety": "images/anxiety.png",
-    "bipolar": "images/bipolar.png",
-    "depression": "images/depression.png",
-    "normal": "images/normal.png",
-    "personality disorder": "images/personality.png",
-    "stress": "images/stress.png",
-    "suicidal": "images/suicidal.png",
-}
+    user_input = st.text_area("Tell me how you feel", height=150)
 
-messages = {
-    "anxiety": "It seems that you feel anxious 😟",
-    "bipolar": "It seems that you may experience mood swings 🎭",
-    "depression": "It seems that you feel depressed 💙",
-    "normal": "It seems that you feel okay 😊",
-    "personality disorder": "It seems there may be personality-related distress 🧩",
-    "stress": "It seems that you are stressed 😣",
-    "suicidal": "It seems that you may have distressing thoughts 💔",
-}
+    messages = {
+        "anxiety": "It seems that you feel anxious 😟",
+        "bipolar": "It seems that you may experience mood swings 🎭",
+        "depression": "It seems that you feel depressed 💙",
+        "normal": "It seems that you feel okay 😊",
+        "personality disorder": "It seems there may be personality-related distress 🧩",
+        "stress": "It seems that you are stressed 😣",
+        "suicidal": "It seems that you may have distressing thoughts 💔",
+    }
 
-if st.button("Analyze..."):
-    if user_input.strip() == "":
-        st.warning("Please enter some text.")
-    else:
-        prediction = predict(user_input)
+    if st.button("Analyze..."):
+        if user_input.strip() == "":
+            st.warning("Please enter some text.")
+        else:
+            if model is None:
+                model = tf.keras.models.load_model("models/model_half_clean.keras")
 
-        st.markdown(
-            f'<div class="result">{messages[prediction]}</div>',
-            unsafe_allow_html=True
-        )
+            prediction = predict(user_input)
 
-        try:
-            img = Image.open(images[prediction])
-            st.image(img, width=250)
-        except:
-            pass
+            st.markdown(
+                f'<div class="result">{messages[prediction]}</div>',
+                unsafe_allow_html=True
+            )
+
+pipeline_1 = None
+pipeline_2 = None
+
+def encode_lang(x):
+    return (x == "fr").astype(int)
+
+def encode_gender(x):
+    return (x == "WOM").astype(int)
+
+with tab2:
+    st.markdown('<div class="title">Système de recommendation</div>', unsafe_allow_html=True)
+
+    st.write("Répondez aux questions suivantes :")
+
+
+    # Questions
+    USER_GENDER = st.radio("Vous êtes...", ["une femme", "un homme"], horizontal=True)
+    USER_AGE = st.number_input("Votre age :", min_value=10, step=1)
+    USER_OWNS_MASK = int(st.radio("Avez-vous un masque ?", ["Oui", "Non"], horizontal=True) == "Oui")
+    USER_OWNS_SUBSCRIPTION = int(st.radio("Avez-vous un abonnement?", ["Oui", "Non"], horizontal=True) == "Oui")
+    USER_APP_LANGUAGE = st.radio("Quelle est votre langue ?", ["français", "english"], horizontal=True)
+    USER_USE_ANDROID = int(st.radio("Utilisez-vous ou avez vous utilisé Android sur votre téléphone ?", ["Oui", "Non"], horizontal=True) == "Oui")
+    USER_USE_IOS = int(st.radio("Utilisez-vous ou avez vous utilisé iOS sur votre téléphone ?", ["Oui", "Non"], horizontal=True) == "Oui")
+    MP_EVITEMENT_SOCRATE = int(st.radio("Lorsque vous devez faire quelque chose qui vous déplaît, en général que faites-vous? ?", ["Je repousse jusqu’à la dernière minute", "Je le fais tout de suite"]) == "Je repousse jusqu’à la dernière minute")
+    MP_OPTION_SOCRATE = int(st.radio("Vous avez tendance à ...", ["Faire plusieurs chose en même temps", "Faire une chose à la fois"]) == "Faire plusieurs chose en même temps")
+
+    if st.button("Voir le résultat"):
+        v = pd.DataFrame({
+            "USER_AGE": [USER_AGE], "USER_GENDER": ["WOM" if USER_GENDER == "une femme" else "MAN"], "USER_APP_LANGUAGE": ["fr" if USER_APP_LANGUAGE == "français" else "en"], "MP_EVITEMENT_SOCRATE": [MP_EVITEMENT_SOCRATE], "MP_OPTION_SOCRATE": [MP_OPTION_SOCRATE], "USER_OWNS_MASK": [USER_OWNS_MASK] ,"USER_OWNS_SUBSCRIPTION": [USER_OWNS_SUBSCRIPTION], "USER_USE_ANDROID": [USER_USE_ANDROID], "USER_USE_IOS": [USER_USE_IOS]})
+
+        if pipeline_1 is None:
+            with open("models/1.pkl", "rb") as fn:
+                pipeline_1 = pickle.load(fn)
+
+        if pipeline_2 is None:
+            with open("models/2.pkl", "rb") as fn:
+                pipeline_2 = pickle.load(fn)
+
+        result_1 = pipeline_1.predict(v)
+        if result_1[0] == 1:
+            st.success("Vous allez aimer le contenu Qu'est-ce que je veux?")
+        else:
+            st.error("Vous n'allez pas aimer le contenu Qu'est-ce que je veux?")
+
+        result_2 = pipeline_2.predict(v)
+        if result_2[0] == 1:
+            st.success("Vous allez aimer le programme Apaiser mes pensées")
+        else:
+            st.error("Vous n'allez pas aimer le programme Apaiser mes pensées")
